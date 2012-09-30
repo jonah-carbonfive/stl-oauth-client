@@ -53,4 +53,8 @@
                                 parameters:(NSDictionary *)parameters;
 
 
+#pragma mark - Helper functions
+
++ (NSString *) baseURLforAddress:(NSURL *)url;
+
 @end

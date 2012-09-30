@@ -222,7 +222,7 @@ static const NSString *kOAuthVersion1_0 = @"1.0";
     return Base64EncodedStringFromData(digestData); 
 }
 
-- (NSString *) baseURLforAddress:(NSURL *)url {
++ (NSString *) baseURLforAddress:(NSURL *)url {
     NSAssert1([url host] != nil, @"URL host missing: %@", [url absoluteString]);
     
     // Port need only be present if it's not the default
@@ -235,8 +235,22 @@ static const NSString *kOAuthVersion1_0 = @"1.0";
         hostString = [NSString stringWithFormat:@"%@:%@", [[url host] lowercaseString], [url port]];
     }
     
-    return [NSString stringWithFormat:@"%@://%@%@", [[url scheme] lowercaseString], hostString, [[url absoluteURL] path]];
+    NSString *absoluteString = [url absoluteString];
+    NSString *pathString = [[url absoluteURL] path];
+
+    // [NSURL path] strips trailing slashes, which will break OAuth signatures
+    // see http://www.mlsite.net/blog/?p=2545
+
+    NSRange pathRange = [absoluteString rangeOfString:pathString];
+    BOOL hasTrailingSlash = NSMaxRange(pathRange) < [absoluteString length] &&
+                            [absoluteString characterAtIndex:NSMaxRange(pathRange)] == '/';
+    if (hasTrailingSlash) {
+        pathString = [pathString stringByAppendingString:@"/"];
+    }
+    
+    return [NSString stringWithFormat:@"%@://%@%@", [[url scheme] lowercaseString], hostString, pathString];
 }
+
 
 @end
 
