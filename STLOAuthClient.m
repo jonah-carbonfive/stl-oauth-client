@@ -110,6 +110,21 @@ realm = _realm;
     return request;
 }
 
+- (NSURLRequest *) xAuthSignedRequestWithMethod:(NSString *)method
+                                           path:(NSString *)path
+                                       username:(NSString *)username
+                                       password:(NSString *)password
+                                     parameters:(NSDictionary *)parameters {
+    NSMutableURLRequest *request = [super requestWithMethod:method path:path parameters:parameters];
+
+    NSString *authorizationHeader = [self authorizationHeaderValueForRequest:request xAuthUsername:username password:password];
+    [request setValue:authorizationHeader forHTTPHeaderField:@"Authorization"];
+    
+    return request;
+}
+
+
+
 #pragma mark - "private" methods.
 
 static const NSString *kOAuthSignatureMethodKey = @"oauth_signature_method";
@@ -121,7 +136,13 @@ static const NSString *kOAuthSignatureKey = @"oauth_signature";
 static const NSString *kOAuthSignatureTypeHMAC_SHA1 = @"HMAC-SHA1";
 static const NSString *kOAuthVersion1_0 = @"1.0";
 
-- (NSMutableDictionary *) mutableDictionaryWithOAuthInitialData {
+static const NSString *kXAuthUsernameKey = @"x_auth_username";
+static const NSString *kXAuthPasswordKey = @"x_auth_password";
+static const NSString *kXAuthModeKey = @"x_auth_mode";
+
+static const NSString *kXAuthModeClientAuth = @"client_auth";
+
+- (NSMutableDictionary *) mutableDictionaryWithOAuthInitialDataAndXAuthUsername:(NSString *)username password:(NSString *)password {
     NSMutableDictionary *result = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                    kOAuthSignatureTypeHMAC_SHA1, kOAuthSignatureMethodKey,
                                    kOAuthVersion1_0, kOAuthVersionKey,
@@ -130,9 +151,19 @@ static const NSString *kOAuthVersion1_0 = @"1.0";
     if (self.consumerKey) [result setObject:self.consumerKey forKey:kOAuthConsumerKey];
     if (self.tokenIdentifier) [result setObject:self.tokenIdentifier forKey:kOAuthTokenIdentifier];
     
+    if (username != nil && password != nil) {
+        [result setObject:username forKey:kXAuthUsernameKey];
+        [result setObject:password forKey:kXAuthPasswordKey];
+        [result setObject:kXAuthModeClientAuth forKey:kXAuthModeKey];
+    }
+    
     [self addGeneratedTimestampAndNonceInto:result];
     
     return  result;
+}
+
+- (NSMutableDictionary *) mutableDictionaryWithOAuthInitialData {
+    return [self mutableDictionaryWithOAuthInitialDataAndXAuthUsername:nil password:nil];
 }
 
 - (NSString *) stringWithOAuthParameters:(NSMutableDictionary *)oauthParams requestParameters:(NSDictionary *)parameters {
@@ -158,10 +189,10 @@ static const NSString *kOAuthVersion1_0 = @"1.0";
     return [longListOfParameters componentsJoinedByString:@"&"];
 }
 
-- (NSString *) authorizationHeaderValueForRequest:(NSURLRequest *)request {
+- (NSString *) authorizationHeaderValueForRequest:(NSURLRequest *)request xAuthUsername:(NSString *)username password:(NSString *)password {
     NSURL *url = request.URL;
-    NSString *fixedURL = [self baseURLforAddress:url];
-    NSMutableDictionary *oauthParams = [self mutableDictionaryWithOAuthInitialData];
+    NSString *fixedURL = [[self class] baseURLforAddress:url];
+    NSMutableDictionary *oauthParams = [self mutableDictionaryWithOAuthInitialDataAndXAuthUsername:username password:password];
     
     // adding oauth_ extra params to the header
     NSArray *parameterComponents = [[request.URL query] componentsSeparatedByString:@"&"];
@@ -190,11 +221,15 @@ static const NSString *kOAuthVersion1_0 = @"1.0";
     
     // let's use the base URL if a realm was not set
     NSString *oauthRealm = self.realm;
-    if (!oauthRealm) oauthRealm = [self baseURLforAddress:[self baseURL]];
+    if (!oauthRealm) oauthRealm = [[self class] baseURLforAddress:[self baseURL]];
     
     NSString *result = [NSString stringWithFormat:@"OAuth realm=\"%@\",%@", oauthRealm, [headerParams componentsJoinedByString:@","]];
     
     return result;
+}
+
+- (NSString *) authorizationHeaderValueForRequest:(NSURLRequest *)request {
+    return [self authorizationHeaderValueForRequest:request xAuthUsername:nil password:nil];
 }
 
 - (void)addGeneratedTimestampAndNonceInto:(NSMutableDictionary *)dictionary {

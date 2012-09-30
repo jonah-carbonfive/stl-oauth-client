@@ -53,4 +53,12 @@
                                 parameters:(NSDictionary *)parameters;
 
 
+#pragma mark - xAuth support
+
+- (NSURLRequest *) xAuthSignedRequestWithMethod:(NSString *)method
+                                           path:(NSString *)path
+                                       username:(NSString *)username
+                                       password:(NSString *)password
+                                     parameters:(NSDictionary *)parameters;
+
 @end
